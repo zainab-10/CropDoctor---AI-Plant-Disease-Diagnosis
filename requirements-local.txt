@@ -1,0 +1,5 @@
+# installed on top of requirements.txt only for the LOCAL backend
+torch>=2.4
+transformers>=4.57
+accelerate>=0.34
+torchvision>=0.19

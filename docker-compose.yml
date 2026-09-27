@@ -1,0 +1,32 @@
+# CropDoctor — pick a profile:
+#   API  (no GPU, needs HF_TOKEN in .env):  docker compose --profile api up --build
+#   LOCAL (runs Qwen3-VL-4B on your GPU):    docker compose --profile local up --build
+# Then open http://localhost:8000
+services:
+  cropdoctor-api:
+    profiles: ["api"]
+    build: { context: ., args: { BACKEND: api } }
+    image: cropdoctor:api
+    ports: ["8000:8000"]
+    environment:
+      MODEL_BACKEND: api
+      HF_TOKEN: ${HF_TOKEN}
+      HF_API_MODEL: meta-llama/Llama-4-Scout-17B-16E-Instruct
+    restart: unless-stopped
+  cropdoctor-local:
+    profiles: ["local"]
+    build: { context: ., args: { BACKEND: local } }
+    image: cropdoctor:local
+    ports: ["8000:8000"]
+    environment:
+      MODEL_BACKEND: local
+      LOCAL_MODEL: Qwen/Qwen3-VL-4B-Instruct
+    volumes: ["./models:/models"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped

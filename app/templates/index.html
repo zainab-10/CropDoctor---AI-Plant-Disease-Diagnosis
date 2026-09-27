@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CropDoctor — AI Plant Disease Diagnosis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a1410; --surface:#0f1c16; --surface-2:#152720; --line:#20372c;
+    --ink:#eaf3ee; --muted:#8fae9d; --leaf:#3fce74; --leaf-2:#9be564; --earth:#c9a15a;
+    --mild:#8bd450; --moderate:#ffb84d; --severe:#ff6b5c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Sora',system-ui,sans-serif;color:var(--ink);background:var(--bg);
+       min-height:100vh;position:relative;overflow-x:hidden}
+  .glow{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .glow::before{content:"";position:absolute;top:-25%;left:50%;transform:translateX(-50%);
+    width:100vw;height:65vh;filter:blur(120px);opacity:.35;
+    background:radial-gradient(closest-side,rgba(63,206,116,.4),transparent),
+               radial-gradient(closest-side,rgba(155,229,100,.25),transparent) 55% 45%}
+  .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:44px 22px 70px}
+
+  .top{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+  .logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:1.3rem;
+        background:linear-gradient(135deg,var(--leaf),var(--leaf-2));box-shadow:0 8px 22px -8px var(--leaf)}
+  .brand{font-weight:700;font-size:1.12rem}
+  .badge{margin-left:auto;display:inline-flex;gap:8px;align-items:center;
+         font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);
+         border:1px solid var(--line);border-radius:99px;padding:6px 12px}
+  .badge i{width:7px;height:7px;border-radius:50%;background:var(--leaf);box-shadow:0 0 10px var(--leaf)}
+
+  h1{font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.02em;line-height:1.05;
+     background:linear-gradient(100deg,#fff 40%,var(--leaf) 100%);
+     -webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:10px}
+  .lede{color:var(--muted);font-size:1.05rem;max-width:62ch;line-height:1.55;margin-bottom:28px}
+
+  .grid{display:grid;grid-template-columns:1fr;gap:20px}
+  @media(min-width:880px){.grid{grid-template-columns:380px 1fr}}
+  .panel{background:linear-gradient(180deg,var(--surface),rgba(15,28,22,.6));
+         border:1px solid var(--line);border-radius:18px;padding:22px;
+         box-shadow:0 26px 60px -36px #000}
+  .plabel{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);
+          letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px}
+
+  .drop{position:relative;display:grid;place-items:center;width:100%;min-height:300px;
+        border:1.5px dashed var(--line);border-radius:14px;cursor:pointer;transition:.18s;
+        background:var(--surface-2);overflow:hidden;text-align:center;padding:20px}
+  .drop:hover,.drop.hot{border-color:var(--leaf)}
+  .drop .ic{font-size:2.1rem;margin-bottom:8px}
+  .drop b{display:block;margin-bottom:4px}
+  .drop small{color:var(--muted);font-size:.84rem}
+  .drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  .drop.has img{display:block} .drop.has .ph{display:none}
+  #file{display:none}
+  .btn{margin-top:14px;width:100%;border:0;border-radius:12px;cursor:pointer;padding:14px;
+       font-family:'Sora';font-weight:700;font-size:1rem;color:#052012;
+       background:linear-gradient(120deg,var(--leaf),var(--leaf-2));
+       box-shadow:0 12px 26px -12px var(--leaf);transition:.15s}
+  .btn:hover:not(:disabled){transform:translateY(-1px)} .btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+
+  /* report */
+  .report{display:none} .report.show{display:block}
+  .empty{color:var(--muted);text-align:center;padding:60px 20px;line-height:1.6}
+  .dx-head{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+  .dx-title{font-size:1.5rem;font-weight:700}
+  .crop-name{color:var(--muted);font-size:.9rem;margin-top:2px}
+  .pills{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+  .pill{font-family:'JetBrains Mono',monospace;font-size:.7rem;padding:5px 10px;border-radius:99px;
+        border:1px solid var(--line);text-transform:uppercase;letter-spacing:.04em}
+  .pill.sev-none{color:var(--leaf);border-color:var(--leaf)}
+  .pill.sev-mild{color:var(--mild);border-color:var(--mild)}
+  .pill.sev-moderate{color:var(--moderate);border-color:var(--moderate)}
+  .pill.sev-severe{color:var(--severe);border-color:var(--severe)}
+  .summary{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;
+           padding:14px 16px;line-height:1.6;margin:14px 0 20px}
+  .sections{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:560px){.sections{grid-template-columns:1fr}}
+  .sec h4{font-size:.82rem;text-transform:uppercase;letter-spacing:.05em;color:var(--leaf);
+          margin-bottom:8px;font-family:'JetBrains Mono',monospace}
+  .sec ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+  .sec li{position:relative;padding-left:18px;color:var(--ink);font-size:.93rem;line-height:1.45}
+  .sec li::before{content:"›";position:absolute;left:2px;color:var(--leaf);font-weight:700}
+
+  /* follow-up chat */
+  .followup{margin-top:22px;border-top:1px solid var(--line);padding-top:18px;display:none}
+  .followup.show{display:block}
+  .fq{display:flex;gap:10px}
+  .fq input{flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;
+            color:var(--ink);font-family:'Sora';font-size:.95rem;padding:12px 14px;outline:none}
+  .fq input:focus{border-color:var(--leaf)}
+  .fq button{border:0;border-radius:11px;padding:0 20px;cursor:pointer;font-weight:700;color:#052012;
+             background:linear-gradient(120deg,var(--leaf),var(--leaf-2))}
+  .chat{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+  .msg{padding:11px 14px;border-radius:12px;font-size:.93rem;line-height:1.5;max-width:88%}
+  .msg.you{align-self:flex-end;background:var(--surface-2);border:1px solid var(--line)}
+  .msg.doc{align-self:flex-start;background:rgba(63,206,116,.10);border:1px solid rgba(63,206,116,.3)}
+
+  .thinking{display:none;align-items:center;gap:10px;color:var(--muted);
+            font-family:'JetBrains Mono',monospace;font-size:.85rem;margin-top:16px}
+  .thinking.show{display:flex}
+  .dots i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--leaf);margin:0 2px;
+          animation:b 1.2s infinite}.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+  @keyframes b{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-6px);opacity:1}}
+  .err{display:none;margin-top:16px;padding:12px 14px;border-radius:10px;font-size:.9rem;
+       background:rgba(255,107,92,.12);border:1px solid rgba(255,107,92,.4);color:#ffb3ab}
+  .disclaimer{margin-top:16px;font-size:.78rem;color:var(--muted);line-height:1.5}
+  footer{margin-top:40px;text-align:center;color:#5c7a68;font-size:.8rem;font-family:'JetBrains Mono',monospace}
+
+  .tabs{display:flex;gap:10px;margin-bottom:20px}
+  .tab{border:1px solid var(--line);background:var(--surface-2);color:var(--muted);
+       border-radius:11px;padding:10px 20px;font-family:'Sora';font-weight:600;font-size:.95rem;
+       cursor:pointer;transition:.15s}
+  .tab:hover{border-color:var(--leaf)}
+  .tab.sel{border-color:var(--leaf);color:var(--ink);box-shadow:0 0 0 1px var(--leaf)}
+  .orient{display:flex;gap:10px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:var(--surface-2);color:var(--muted);
+        border-radius:10px;padding:9px 14px;font-family:'Sora';font-size:.86rem;cursor:pointer;transition:.15s}
+  .chip:hover{border-color:var(--leaf)} .chip.sel{border-color:var(--leaf);color:var(--ink);box-shadow:0 0 0 1px var(--leaf)}
+  .vwarn{margin-top:14px;padding:11px 14px;border-radius:10px;font-size:.82rem;line-height:1.5;
+         color:#ffd9a0;background:rgba(255,184,77,.10);border:1px solid rgba(255,184,77,.32)}
+  .vprogress{display:none;margin-top:18px}
+  .vprogress.show{display:block}
+  .vbar{height:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+  .vbar>i{display:block;height:100%;width:0%;border-radius:99px;
+          background:linear-gradient(90deg,var(--leaf),var(--leaf-2));transition:width .4s}
+  .vptext{margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--muted)}
+  .vdl{display:inline-flex;gap:8px;margin-top:14px;color:var(--leaf);text-decoration:none;
+       font-size:.9rem;font-weight:600;border:1px solid var(--line);border-radius:10px;padding:10px 16px}
+  .vdl:hover{border-color:var(--leaf);background:rgba(63,206,116,.08)}
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="wrap">
+  <div class="top">
+    <div class="logo">&#127807;</div>
+    <div class="brand">CropDoctor</div>
+    <div class="badge"><i></i> <span id="beInfo">loading&hellip;</span></div>
+  </div>
+
+  <h1>Diagnose crop diseases from a photo</h1>
+  <p class="lede">Snap a leaf or plant, and an AI agronomist identifies the likely disease, how severe it is, and what to do about it &mdash; with treatment and prevention advice a farmer can act on today.</p>
+
+  <div class="tabs" id="tabs">
+    <button class="tab sel" data-t="image">&#128247; Image</button>
+    <button class="tab" data-t="video">&#127909; Video</button>
+  </div>
+
+  <!-- ============ VIDEO PANEL ============ -->
+  <div id="videoMode" style="display:none">
+    <div class="panel">
+      <div class="plabel">Crop video</div>
+      <label class="drop" id="vdrop" style="min-height:220px">
+        <div class="ph">
+          <div class="ic">&#127909;</div>
+          <b>Drop a crop video</b>
+          <small>mp4, mov, avi, mkv, webm &middot; up to 200 MB</small>
+        </div>
+        <video id="vpreview" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none" muted></video>
+        <input type="file" id="vfile" accept="video/*">
+      </label>
+
+      <div style="margin-top:16px">
+        <div class="plabel">Diagnose one frame every</div>
+        <div class="orient" id="rate">
+          <button class="chip sel" data-s="2">2 seconds</button>
+          <button class="chip" data-s="1">1 second</button>
+          <button class="chip" data-s="4">4 seconds</button>
+        </div>
+      </div>
+
+      <div class="vwarn">A vision model is slow per frame &mdash; expect several minutes for a short clip. For video, the <b>local</b> backend is strongly recommended (the free API will rate-limit). Larger intervals = faster.</div>
+
+      <button class="btn" id="vgo" disabled style="margin-top:16px">Analyze video</button>
+
+      <div class="vprogress" id="vprogress">
+        <div class="vbar"><i id="vbarFill"></i></div>
+        <div class="vptext" id="vptext">Starting&hellip;</div>
+      </div>
+      <div class="err" id="verr"></div>
+
+      <div id="vresult" style="display:none;margin-top:18px">
+        <div class="plabel">Annotated result</div>
+        <video id="voutput" controls playsinline style="width:100%;border-radius:12px;border:1px solid var(--line);background:#000"></video>
+        <a class="vdl" id="vdl" download>&darr; Download annotated video</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ IMAGE PANEL ============ -->
+  <div class="grid" id="imageMode">
+    <section class="panel">
+      <div class="plabel">Crop photo</div>
+      <label class="drop" id="drop">
+        <div class="ph">
+          <div class="ic">&#127811;</div>
+          <b>Drop a leaf/plant photo</b>
+          <small>or click to browse &mdash; jpg, png, webp</small>
+        </div>
+        <img id="preview" alt="preview">
+        <input type="file" id="file" accept="image/*">
+      </label>
+      <button class="btn" id="go" disabled>Diagnose</button>
+      <p class="disclaimer">CropDoctor is an AI advisory tool, not a substitute for a certified agronomist. For critical decisions, confirm with a local expert.</p>
+    </section>
+
+    <section class="panel">
+      <div class="plabel">Diagnosis</div>
+      <div class="empty" id="empty">Upload a crop photo and press <b>Diagnose</b> to see a full report here.</div>
+
+      <div class="thinking" id="thinking"><span class="dots"><i></i><i></i><i></i></span> Examining the plant&hellip;</div>
+      <div class="err" id="err"></div>
+
+      <div class="report" id="report">
+        <div class="dx-head">
+          <div>
+            <div class="dx-title" id="dxTitle"></div>
+            <div class="crop-name" id="cropName"></div>
+          </div>
+          <div class="pills" id="pills"></div>
+        </div>
+        <div class="summary" id="summary"></div>
+        <div class="sections">
+          <div class="sec"><h4>Symptoms</h4><ul id="symptoms"></ul></div>
+          <div class="sec"><h4>Likely causes</h4><ul id="causes"></ul></div>
+          <div class="sec"><h4>Treatment</h4><ul id="treatment"></ul></div>
+          <div class="sec"><h4>Prevention</h4><ul id="prevention"></ul></div>
+        </div>
+
+        <div class="followup show" id="followup">
+          <div class="plabel">Ask a follow-up</div>
+          <div class="fq">
+            <input id="fInput" placeholder="e.g. Is this safe for organic farming? How often do I spray?">
+            <button id="fSend">Ask</button>
+          </div>
+          <div class="chat" id="chat"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer>CropDoctor &middot; Qwen3-VL + FastAPI + Docker &middot; portfolio project</footer>
+</div>
+
+<script>
+const fileInput=document.getElementById('file'),drop=document.getElementById('drop'),
+ preview=document.getElementById('preview'),go=document.getElementById('go'),
+ empty=document.getElementById('empty'),thinking=document.getElementById('thinking'),
+ err=document.getElementById('err'),report=document.getElementById('report'),
+ beInfo=document.getElementById('beInfo'),chat=document.getElementById('chat'),
+ fInput=document.getElementById('fInput'),fSend=document.getElementById('fSend');
+let chosen=null, priorSummary='';
+
+fetch('/api/health').then(r=>r.json()).then(d=>{
+  beInfo.textContent=(d.backend==='local'?'LOCAL':'HF API')+' · '+(d.model||'').split('/').pop();
+}).catch(()=>{beInfo.textContent='backend offline';});
+
+function pick(f){ if(!f)return; chosen=f; preview.src=URL.createObjectURL(f);
+  drop.classList.add('has'); go.disabled=false; err.style.display='none'; }
+fileInput.addEventListener('change',e=>pick(e.target.files[0]));
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hot');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hot');}));
+drop.addEventListener('drop',e=>pick(e.dataTransfer.files[0]));
+
+go.addEventListener('click',async()=>{
+  if(!chosen)return;
+  go.disabled=true; empty.style.display='none'; report.classList.remove('show');
+  err.style.display='none'; thinking.classList.add('show'); chat.innerHTML='';
+  const fd=new FormData(); fd.append('image',chosen);
+  try{
+    const r=await fetch('/api/diagnose',{method:'POST',body:fd});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.detail||'Diagnosis failed');
+    render(d.result);
+  }catch(e){ err.textContent=e.message; err.style.display='block'; }
+  finally{ thinking.classList.remove('show'); go.disabled=false; }
+});
+
+function li(list, items){
+  list.innerHTML='';
+  (items&&items.length?items:['—']).forEach(t=>{
+    const el=document.createElement('li'); el.textContent=t; list.appendChild(el);
+  });
+}
+function render(res){
+  priorSummary=res.summary||'';
+  if(res.is_plant===false){
+    document.getElementById('dxTitle').textContent='Not a plant';
+    document.getElementById('cropName').textContent='';
+    document.getElementById('pills').innerHTML='';
+    document.getElementById('summary').textContent=res.summary||'This image does not look like a plant.';
+    ['symptoms','causes','treatment','prevention'].forEach(id=>li(document.getElementById(id),[]));
+    report.classList.add('show'); return;
+  }
+  const healthy = res.healthy===true;
+  document.getElementById('dxTitle').textContent = healthy ? 'Looks healthy' : (res.diagnosis||'Diagnosis');
+  document.getElementById('cropName').textContent = res.crop && res.crop!=='uncertain' ? 'Crop: '+res.crop : '';
+  const sev=(res.severity||'none').toLowerCase(), conf=(res.confidence||'').toLowerCase();
+  const pills=document.getElementById('pills'); pills.innerHTML='';
+  addPill(pills,'sev-'+sev, sev+' severity');
+  if(conf) addPill(pills,'', conf+' confidence');
+  document.getElementById('summary').textContent=res.summary||'';
+  li(document.getElementById('symptoms'),res.symptoms);
+  li(document.getElementById('causes'),res.causes);
+  li(document.getElementById('treatment'),res.treatment);
+  li(document.getElementById('prevention'),res.prevention);
+  report.classList.add('show');
+}
+function addPill(box,cls,txt){ const p=document.createElement('span'); p.className='pill '+cls; p.textContent=txt; box.appendChild(p); }
+
+async function sendFollowup(){
+  const q=fInput.value.trim(); if(!q||!chosen)return;
+  addMsg('you',q); fInput.value='';
+  const wait=addMsg('doc','…');
+  const fd=new FormData(); fd.append('image',chosen); fd.append('question',q); fd.append('prior_summary',priorSummary);
+  try{
+    const r=await fetch('/api/followup',{method:'POST',body:fd});
+    const d=await r.json();
+    wait.textContent = r.ok ? d.answer : (d.detail||'Failed to answer');
+  }catch(e){ wait.textContent='Error: '+e.message; }
+}
+fSend.addEventListener('click',sendFollowup);
+fInput.addEventListener('keydown',e=>{ if(e.key==='Enter') sendFollowup(); });
+function addMsg(who,txt){ const m=document.createElement('div'); m.className='msg '+who; m.textContent=txt; chat.appendChild(m); chat.scrollTop=chat.scrollHeight; return m; }
+
+/* ---------------- Image/Video tabs ---------------- */
+const tabs=document.getElementById('tabs'),
+ imageMode=document.getElementById('imageMode'),
+ videoMode=document.getElementById('videoMode');
+tabs.addEventListener('click',e=>{
+  const t=e.target.closest('.tab'); if(!t) return;
+  [...tabs.children].forEach(c=>c.classList.remove('sel')); t.classList.add('sel');
+  const v = t.dataset.t==='video';
+  videoMode.style.display = v?'block':'none';
+  imageMode.style.display = v?'none':'grid';
+});
+
+/* ---------------- Video diagnosis ---------------- */
+const vfile=document.getElementById('vfile'),vdrop=document.getElementById('vdrop'),
+ vpreview=document.getElementById('vpreview'),vgo=document.getElementById('vgo'),
+ rate=document.getElementById('rate'),vprogress=document.getElementById('vprogress'),
+ vbarFill=document.getElementById('vbarFill'),vptext=document.getElementById('vptext'),
+ verr=document.getElementById('verr'),vresult=document.getElementById('vresult'),
+ voutput=document.getElementById('voutput'),vdl=document.getElementById('vdl');
+let vchosen=null, everySec='2';
+
+function vpick(f){ if(!f)return; vchosen=f; vpreview.src=URL.createObjectURL(f);
+  vpreview.style.display='block'; vdrop.querySelector('.ph').style.display='none';
+  vgo.disabled=false; verr.style.display='none'; vresult.style.display='none'; }
+vfile.addEventListener('change',e=>vpick(e.target.files[0]));
+['dragover','dragenter'].forEach(ev=>vdrop.addEventListener(ev,e=>{e.preventDefault();vdrop.classList.add('hot');}));
+['dragleave','drop'].forEach(ev=>vdrop.addEventListener(ev,e=>{e.preventDefault();vdrop.classList.remove('hot');}));
+vdrop.addEventListener('drop',e=>vpick(e.dataTransfer.files[0]));
+rate.addEventListener('click',e=>{ const c=e.target.closest('.chip'); if(!c)return;
+  [...rate.children].forEach(x=>x.classList.remove('sel')); c.classList.add('sel'); everySec=c.dataset.s; });
+
+vgo.addEventListener('click',async()=>{
+  if(!vchosen)return;
+  vgo.disabled=true; verr.style.display='none'; vresult.style.display='none';
+  vprogress.classList.add('show'); vbarFill.style.width='0%'; vptext.textContent='Uploading video…';
+  const fd=new FormData(); fd.append('video_file',vchosen); fd.append('every_sec',everySec);
+  let job;
+  try{
+    const r=await fetch('/api/diagnose_video',{method:'POST',body:fd});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.detail||'Upload failed');
+    job=d.job_id;
+  }catch(e){ vfail(e.message); return; }
+  vptext.textContent='Analyzing frames… this can take several minutes.';
+  vpoll(job);
+});
+
+function vpoll(job){
+  const t=setInterval(async()=>{
+    try{
+      const r=await fetch('/api/video_status/'+job);
+      const d=await r.json();
+      const p=d.progress||0; vbarFill.style.width=p+'%';
+      vptext.textContent='Analyzing frames… '+p+'%';
+      if(d.status==='done'){ clearInterval(t); vshow(d); }
+      else if(d.status==='error'){ clearInterval(t); vfail(d.error||'Processing failed'); }
+    }catch(e){ clearInterval(t); vfail('Lost connection to server.'); }
+  },2000);
+}
+function vshow(d){
+  vprogress.classList.remove('show'); vgo.disabled=false;
+  voutput.src=d.video_url; vdl.href=d.video_url;
+  vresult.style.display='block';
+  vresult.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function vfail(msg){ vprogress.classList.remove('show'); vgo.disabled=false;
+  verr.textContent=msg; verr.style.display='block'; }
+
+</script>
+</body>
+</html>

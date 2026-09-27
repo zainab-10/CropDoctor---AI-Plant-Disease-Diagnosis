@@ -1,0 +1,6 @@
+﻿__pycache__/
+*.pyc
+models/
+video_uploads/
+video_outputs/
+.env
