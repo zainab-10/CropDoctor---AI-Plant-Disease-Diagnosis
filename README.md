@@ -213,10 +213,3 @@ Released under the [MIT License](LICENSE).
 ## 🙏 Acknowledgements
 - [Qwen3-VL](https://huggingface.co/Qwen) for the underlying vision-language model
 - [Hugging Face](https://huggingface.co/) for free hosted inference and Spaces deployment
-
----
-
-<div align="center">
-Made with ❤️ — no dataset, no training, just a well-engineered prompt on top of a strong pretrained model.
-</div>
->>>>>>> 8dc34ea905c1bba5abd34de0ed4813a03690b3d5
